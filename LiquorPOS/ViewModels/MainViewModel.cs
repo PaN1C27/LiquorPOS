@@ -1,21 +1,22 @@
-﻿using System;
+﻿using System; // For Exception
 using System.Collections.Generic;
-using System.Linq;
+using System.Linq; // Required for .Sum()
 using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LiquorPOS.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Windows; // For MessageBox
+using System.Windows;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized; // Required for NotifyCollectionChangedEventArgs
 
 namespace LiquorPOS.ViewModels
 {
     public partial class MainViewModel : BaseViewModel
     {
-        // These properties will automatically notify the View when changed
         [ObservableProperty]
-        private string? _barcodeText; // Holds the text from the TextBox
+        private string? _barcodeText;
 
         [ObservableProperty]
         private string _foundItemName = "---";
@@ -23,14 +24,41 @@ namespace LiquorPOS.ViewModels
         [ObservableProperty]
         private string _foundItemPrice = "---";
 
-        // This creates an ICommand called 'ScanBarcodeCommand'
-        // which will execute the ScanBarcodeAsync method.
+        [ObservableProperty]
+        private ObservableCollection<Product> _scannedItemsList;
+
+        // --- NEW: Property to hold the total price ---
+        [ObservableProperty]
+        private decimal _totalPrice;
+
+        public MainViewModel()
+        {
+            ScannedItemsList = new ObservableCollection<Product>();
+            // --- NEW: Subscribe to the CollectionChanged event ---
+            ScannedItemsList.CollectionChanged += ScannedItemsList_CollectionChanged;
+            TotalPrice = 0m; // Initialize
+        }
+
+        // --- NEW: Event handler for when the ScannedItemsList changes ---
+        private void ScannedItemsList_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            CalculateTotalPrice();
+        }
+
+        // --- NEW: Method to calculate the total price ---
+        private void CalculateTotalPrice()
+        {
+            // Product.Price is decimal? (nullable decimal)
+            // So, product.Price ?? 0m means "if product.Price is null, use 0m, otherwise use product.Price.Value"
+            TotalPrice = ScannedItemsList.Sum(product => product.Price ?? 0m);
+        }
+
         [RelayCommand]
         private async Task ScanBarcodeAsync()
         {
             if (string.IsNullOrWhiteSpace(BarcodeText))
             {
-                return; // Do nothing if input is empty
+                return;
             }
 
             string scannedBarcode = BarcodeText.Trim();
@@ -50,6 +78,12 @@ namespace LiquorPOS.ViewModels
                         var product = barcodeEntry.Product;
                         FoundItemName = $"{product.Brand} {product.Description}".Trim();
                         FoundItemPrice = $"{product.Price:C}";
+
+                        // Add to the list. The CollectionChanged event will trigger CalculateTotalPrice.
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            ScannedItemsList.Add(product);
+                        });
                     }
                     else
                     {
@@ -66,9 +100,7 @@ namespace LiquorPOS.ViewModels
             }
             finally
             {
-                BarcodeText = string.Empty; // Clear the input property
-                                            // How to set focus back is a bit trickier in pure MVVM,
-                                            // sometimes requires an "interaction" or small code-behind.
+                BarcodeText = string.Empty;
             }
         }
     }

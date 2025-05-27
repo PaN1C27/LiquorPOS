@@ -19,7 +19,7 @@ namespace LiquorPOS.Models
         public string CodeNum { get; set; }
 
         [Column("qty")]
-        public int Quantity { get; set; }
+        public int? Quantity { get; set; }
 
         // Navigation property: Links back to the Product
         [ForeignKey("CodeNum")]
