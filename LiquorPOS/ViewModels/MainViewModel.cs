@@ -1,19 +1,17 @@
-﻿using System; // For Exception
-using System.Collections.Generic;
-using System.Linq; // Required for .Sum()
-using System.Text;
-using System.Threading.Tasks;
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LiquorPOS.Models;
+using LiquorPOS.Models; // Ensure this namespace is correct for your Product, Barcode models
 using Microsoft.EntityFrameworkCore;
-using System.Windows;
+using System;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized; // Required for NotifyCollectionChangedEventArgs
+using System.Collections.Specialized;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
 
-namespace LiquorPOS.ViewModels
+namespace LiquorPOS.ViewModels // Ensure this namespace is correct
 {
-    public partial class MainViewModel : BaseViewModel
+    public partial class MainViewModel : BaseViewModel // Assuming BaseViewModel is set up
     {
         [ObservableProperty]
         private string? _barcodeText;
@@ -25,32 +23,30 @@ namespace LiquorPOS.ViewModels
         private string _foundItemPrice = "---";
 
         [ObservableProperty]
-        private ObservableCollection<Product> _scannedItemsList;
+        private ObservableCollection<ScannedItemViewModel> _scannedItemsList;
 
-        // --- NEW: Property to hold the total price ---
         [ObservableProperty]
         private decimal _totalPrice;
 
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(DeleteItemCommand))] // Only notify for DeleteItemCommand now
+        private ScannedItemViewModel? _selectedItem;
+
         public MainViewModel()
         {
-            ScannedItemsList = new ObservableCollection<Product>();
-            // --- NEW: Subscribe to the CollectionChanged event ---
+            ScannedItemsList = new ObservableCollection<ScannedItemViewModel>();
             ScannedItemsList.CollectionChanged += ScannedItemsList_CollectionChanged;
-            TotalPrice = 0m; // Initialize
+            TotalPrice = 0m;
         }
 
-        // --- NEW: Event handler for when the ScannedItemsList changes ---
         private void ScannedItemsList_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             CalculateTotalPrice();
         }
 
-        // --- NEW: Method to calculate the total price ---
         private void CalculateTotalPrice()
         {
-            // Product.Price is decimal? (nullable decimal)
-            // So, product.Price ?? 0m means "if product.Price is null, use 0m, otherwise use product.Price.Value"
-            TotalPrice = ScannedItemsList.Sum(product => product.Price ?? 0m);
+            TotalPrice = ScannedItemsList.Sum(item => (item.ProductDetails?.Price ?? 0m) * item.Quantity);
         }
 
         [RelayCommand]
@@ -67,7 +63,7 @@ namespace LiquorPOS.ViewModels
 
             try
             {
-                await using (var context = new LiquorDbContext())
+                await using (var context = new LiquorDbContext()) // Ensure LiquorDbContext is correctly named and configured
                 {
                     var barcodeEntry = await context.Barcodes
                                                  .Include(b => b.Product)
@@ -79,10 +75,10 @@ namespace LiquorPOS.ViewModels
                         FoundItemName = $"{product.Brand} {product.Description}".Trim();
                         FoundItemPrice = $"{product.Price:C}";
 
-                        // Add to the list. The CollectionChanged event will trigger CalculateTotalPrice.
                         Application.Current.Dispatcher.Invoke(() =>
                         {
-                            ScannedItemsList.Add(product);
+                            var newItem = new ScannedItemViewModel(product, 1);
+                            ScannedItemsList.Add(newItem);
                         });
                     }
                     else
@@ -103,5 +99,42 @@ namespace LiquorPOS.ViewModels
                 BarcodeText = string.Empty;
             }
         }
+
+        [RelayCommand]
+        private void VoidSale()
+        {
+            if (ScannedItemsList.Any())
+            {
+                ScannedItemsList.Clear();
+                FoundItemName = "---";
+                FoundItemPrice = "---";
+            }
+            BarcodeText = string.Empty;
+        }
+
+        // This method determines if DeleteItemCommand can execute
+        private bool CanModifyOrDeleteItem()
+        {
+            return SelectedItem != null;
+        }
+
+        // Command to Delete an Item (used by DEL key)
+        [RelayCommand(CanExecute = nameof(CanModifyOrDeleteItem))]
+        private void DeleteItem(ScannedItemViewModel? itemToDelete)
+        {
+            // For DEL key, itemToDelete will be the SelectedItem passed as CommandParameter
+            var itemToRemove = itemToDelete ?? SelectedItem;
+
+            if (itemToRemove != null && ScannedItemsList.Contains(itemToRemove))
+            {
+                ScannedItemsList.Remove(itemToRemove);
+                if (SelectedItem == itemToRemove)
+                {
+                    SelectedItem = null;
+                }
+            }
+        }
+
+        // EditQuantityCommand has been removed
     }
 }
