@@ -29,6 +29,7 @@
                 </TextBox.InputBindings>
             </TextBox>
             <Button Content="Scan" Command="{Binding ScanBarcodeCommand}" Margin="10,0,0,0" Padding="10,2"/>
+            <Button Content="View Products" Command="{Binding ShowProductsCommand}" Margin="10,0,0,0" Padding="10,2"/>
         </StackPanel>
 
         <StackPanel Grid.Row="1" Margin="0,0,0,10">

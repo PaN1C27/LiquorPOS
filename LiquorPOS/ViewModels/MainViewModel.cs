@@ -8,6 +8,7 @@ using System.Collections.Specialized;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using LiquorPOS;
 
 namespace LiquorPOS.ViewModels // Ensure this namespace is correct
 {
@@ -133,6 +134,13 @@ namespace LiquorPOS.ViewModels // Ensure this namespace is correct
                     SelectedItem = null;
                 }
             }
+        }
+
+        [RelayCommand]
+        private void ShowProducts()
+        {
+            var window = new ProductListWindow();
+            window.Show();
         }
 
         // EditQuantityCommand has been removed
