@@ -47,38 +47,86 @@
                   SelectionMode="Single"
                   FontSize="14">
 
+            <DataGrid.Resources>
+                <!-- Select the row that was right-clicked -->
+                <Style TargetType="DataGridRow">
+                    <EventSetter Event="PreviewMouseRightButtonDown"
+                         Handler="DataGridRow_RightClick"/>
+                </Style>
+            </DataGrid.Resources>
+
+            <!-- Context-menu that calls EditQuantityCommand -->
+            <DataGrid.ContextMenu>
+                <!-- ①  Copy DataGrid's DataContext into the popup -->
+                <ContextMenu DataContext="{Binding PlacementTarget.DataContext,
+                                       RelativeSource={RelativeSource Self}}">
+                    <!-- ②  Now a simple binding works -->
+                    <MenuItem Header="Change Qty"
+                  Command="{Binding EditQuantityCommand}"/>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
+
             <DataGrid.InputBindings>
                 <KeyBinding Key="Delete"
                             Command="{Binding DeleteItemCommand}"
                             CommandParameter="{Binding SelectedItem}"/>
+
+                <KeyBinding Key="F2"
+                Command="{Binding EditQuantityCommand}"/>
             </DataGrid.InputBindings>
 
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Qty" Binding="{Binding Quantity}" Width="Auto"/>
-                <DataGridTextColumn Header="Code" Binding="{Binding ProductDetails.CodeNum}" Width="Auto"/>
-                <DataGridTextColumn Header="Brand" Binding="{Binding ProductDetails.Brand}" Width="1.5*"/>
-                <DataGridTextColumn Header="Description" Binding="{Binding ProductDetails.Description}" Width="2.5*"/>
-                <DataGridTextColumn Header="Type" Binding="{Binding ProductDetails.Type}" Width="Auto"/>
-                <DataGridTextColumn Header="Size" Binding="{Binding ProductDetails.Size}" Width="Auto"/>
-                <DataGridTextColumn Header="Price" Binding="{Binding ProductDetails.Price, StringFormat=C}" Width="Auto"/>
+                <DataGridTextColumn Header="Line"       Binding="{Binding LineNumber}"           Width="45"/>
+                <DataGridTextColumn Header="Brand"      Binding="{Binding Brand}"                Width="1.4*"/>
+                <DataGridTextColumn Header="Description" Binding="{Binding Description}"          Width="2.4*"/>
+                <DataGridTextColumn Header="Size"       Binding="{Binding Size}"                 Width="60"/>
+                <DataGridTextColumn Header="Pack"       Binding="{Binding Pack}"                 Width="60"/>
+                <DataGridTextColumn Header="Qty"        Binding="{Binding Quantity}"             Width="50"/>
+                <DataGridTextColumn Header="Price"      Binding="{Binding Price,   StringFormat=C}" Width="80"/>
+                <DataGridTextColumn Header="Tax"        Binding="{Binding Tax,     StringFormat=C}" Width="70"/>
+                <DataGridTextColumn Header="Deposit"    Binding="{Binding Deposit, StringFormat=C}" Width="80"/>
+                <DataGridTextColumn Header="Disc%"      Binding="{Binding Discount, StringFormat={}{0:N1}%}" Width="65"/>
+                <DataGridTextColumn Header="Sale"       Binding="{Binding Sale,    StringFormat=C}" Width="80"/>
+                <DataGridTextColumn Header="Extended"   Binding="{Binding Extended,StringFormat=C}" Width="90"/>
             </DataGrid.Columns>
         </DataGrid>
 
+        <!-- Bottom bar -->
         <Grid Grid.Row="3" Margin="0,10,0,0">
+            <!-- 0        1        2         3          4 -->
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
+                <!-- pushes everything right -->
                 <ColumnDefinition Width="Auto"/>
+                <!-- "Total:" label         -->
                 <ColumnDefinition Width="Auto"/>
+                <!-- grand-total value      -->
                 <ColumnDefinition Width="Auto"/>
+                <!-- Change-Qty button      -->
+                <ColumnDefinition Width="Auto"/>
+                <!-- Void-Sale button       -->
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="1" Text="Total:" FontWeight="Bold" FontSize="20" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <TextBlock Grid.Column="2" Text="{Binding TotalPrice, StringFormat=C}" MinWidth="120" TextAlignment="Right"
-                       FontSize="20" Margin="0,0,0,0" VerticalAlignment="Center" FontWeight="Bold"/>
-            <Button Grid.Column="3" Content="Void Sale"
-                    Command="{Binding VoidSaleCommand}"
-                    FontSize="16" FontWeight="Bold"
-                    Margin="20,0,0,0" Padding="15,7"
-                    Background="OrangeRed" Foreground="White"/>
+
+            <TextBlock Grid.Column="1" Text="Total:"
+               FontWeight="Bold" FontSize="20"
+               VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+            <TextBlock Grid.Column="2"
+               Text="{Binding TotalPrice, StringFormat=C}"
+               FontSize="20" FontWeight="Bold"
+               VerticalAlignment="Center" Margin="0,0,20,0"
+               MinWidth="120" TextAlignment="Right"/>
+
+            <Button  Grid.Column="3" Content="Change Qty"
+             Command="{Binding EditQuantityCommand}"
+             FontSize="16" FontWeight="Bold"
+             Padding="15,7" Margin="0,0,10,0"/>
+
+            <Button  Grid.Column="4" Content="Void Sale"
+             Command="{Binding VoidSaleCommand}"
+             FontSize="16" FontWeight="Bold"
+             Background="OrangeRed" Foreground="White"
+             Padding="15,7"/>
         </Grid>
     </Grid>
 </Window>

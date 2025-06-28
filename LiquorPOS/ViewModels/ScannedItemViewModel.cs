@@ -21,6 +21,30 @@ namespace LiquorPOS.ViewModels // Or LiquorPOS.Models, depending on your project
         [ObservableProperty]
         private int _quantity;
 
+        // ── NEW: columns requested by the grid ───────────────────────
+        public int LineNumber { get; init; }
+
+        public string? Brand => ProductDetails?.Brand;                       // :contentReference[oaicite:2]{index=2}
+        public string? Description => ProductDetails?.Description;
+        public string? Size => ProductDetails?.Size;
+        public string? Pack => ProductDetails?.QtyCase?.ToString();         // “Pack” ≈ QtyCase
+        public decimal? Price => ProductDetails?.Price;
+
+        // optional values—leave null for blank cells
+        [ObservableProperty] private decimal? _tax;
+        [ObservableProperty] private decimal? _deposit;
+        [ObservableProperty] private decimal? _discount;
+        [ObservableProperty] private decimal? _sale;
+
+        public decimal? Extended => (Price ?? 0m - (Discount ?? 0m) + (Deposit ?? 0m) + (Tax ?? 0m)) * Quantity;
+
+        public ScannedItemViewModel(Product product, int qty, int lineNo)
+        {
+            _productDetails = product;
+            _quantity = qty;
+            LineNumber = lineNo;
+        }
+
         /// <summary>
         /// Constructor for a new scanned item.
         /// </summary>

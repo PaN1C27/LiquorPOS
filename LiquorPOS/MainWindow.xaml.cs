@@ -1,11 +1,16 @@
 ﻿using System.Windows;
-// using System.Windows.Controls; // May not be needed if DataGridRow is not explicitly typed
-// using System.Windows.Input; // May not be needed if KeyEventArgs/MouseButtonEventArgs are not used here
+using System.Windows.Controls; // May not be needed if DataGridRow is not explicitly typed
+using System.Windows.Input; // May not be needed if KeyEventArgs/MouseButtonEventArgs are not used here
 
 namespace LiquorPOS // Ensure this namespace is correct
 {
     public partial class MainWindow : Window
     {
+        private void DataGridRow_RightClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is DataGridRow row) row.IsSelected = true; // makes CanExecute true
+        }
+
         public MainWindow()
         {
             InitializeComponent();

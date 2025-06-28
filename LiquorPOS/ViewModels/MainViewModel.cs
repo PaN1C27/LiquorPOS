@@ -30,7 +30,8 @@ namespace LiquorPOS.ViewModels // Ensure this namespace is correct
         private decimal _totalPrice;
 
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(DeleteItemCommand))] // Only notify for DeleteItemCommand now
+        [NotifyCanExecuteChangedFor(nameof(DeleteItemCommand))]
+        [NotifyCanExecuteChangedFor(nameof(EditQuantityCommand))]
         private ScannedItemViewModel? _selectedItem;
 
         public MainViewModel()
@@ -47,7 +48,7 @@ namespace LiquorPOS.ViewModels // Ensure this namespace is correct
 
         private void CalculateTotalPrice()
         {
-            TotalPrice = ScannedItemsList.Sum(item => (item.ProductDetails?.Price ?? 0m) * item.Quantity);
+            TotalPrice = ScannedItemsList.Sum(i => i.Extended ?? 0m);
         }
 
         [RelayCommand]
@@ -78,7 +79,7 @@ namespace LiquorPOS.ViewModels // Ensure this namespace is correct
 
                         Application.Current.Dispatcher.Invoke(() =>
                         {
-                            var newItem = new ScannedItemViewModel(product, 1);
+                            var newItem = new ScannedItemViewModel(product, 1, ScannedItemsList.Count + 1);
                             ScannedItemsList.Add(newItem);
                         });
                     }
@@ -136,13 +137,30 @@ namespace LiquorPOS.ViewModels // Ensure this namespace is correct
             }
         }
 
+        // Command runs only when something is selected
+        [RelayCommand(CanExecute = nameof(CanModifyOrDeleteItem))]
+        private void EditQuantity()
+        {
+            if (SelectedItem is null) return;
+
+            var dlg = new QuantityInputWindow(SelectedItem.Quantity)
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            if (dlg.ShowDialog() == true)
+            {
+                SelectedItem.Quantity = dlg.EnteredQuantity;
+                // Re-compute grand total
+                CalculateTotalPrice();
+            }
+        }
+
         [RelayCommand]
         private void ShowProducts()
         {
             var window = new ProductListWindow();
             window.Show();
         }
-
-        // EditQuantityCommand has been removed
     }
 }
