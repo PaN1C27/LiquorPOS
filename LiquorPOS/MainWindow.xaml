@@ -3,15 +3,15 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:LiquorPOS"
-        xmlns:vm="clr-namespace:LiquorPOS.ViewModels" mc:Ignorable="d"
-        Title="Liquor Store POS" Height="600" Width="900">
+        mc:Ignorable="d"
+        Title="Liquor Store POS"
+        Height="600"
+        Width="950">
 
-    <Window.DataContext>
-        <vm:MainViewModel/>
-    </Window.DataContext>
+    <!--  No Window.DataContext here—DI sets it in MainWindow.xaml.cs  -->
 
     <Grid Margin="10">
+        <!-- Rows: barcode bar • last-scan panel • items grid • bottom bar -->
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -19,114 +19,148 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- ░░ Row 0 – barcode entry ░░ -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            <Label Content="Scan Barcode:" VerticalAlignment="Center" FontWeight="Bold"/>
-            <TextBox Width="300" Margin="10,0,0,0" FontSize="16"
-                     Text="{Binding BarcodeText, UpdateSourceTrigger=PropertyChanged}"
-                     x:Name="BarcodeEntryTextBox">
+            <Label Content="Scan Barcode:"
+                   VerticalAlignment="Center"
+                   FontWeight="Bold"/>
+            <TextBox x:Name="BarcodeEntryTextBox"
+                     Width="300"
+                     Margin="10,0,0,0"
+                     FontSize="16"
+                     Text="{Binding BarcodeText, UpdateSourceTrigger=PropertyChanged}">
                 <TextBox.InputBindings>
-                    <KeyBinding Key="Enter" Command="{Binding ScanBarcodeCommand}"/>
+                    <KeyBinding Key="Enter"
+                                Command="{Binding ScanBarcodeCommand}"/>
                 </TextBox.InputBindings>
             </TextBox>
-            <Button Content="Scan" Command="{Binding ScanBarcodeCommand}" Margin="10,0,0,0" Padding="10,2"/>
-            <Button Content="View Products" Command="{Binding ShowProductsCommand}" Margin="10,0,0,0" Padding="10,2"/>
+            <Button Content="Scan"
+                    Command="{Binding ScanBarcodeCommand}"
+                    Margin="10,0,0,0"
+                    Padding="10,2"/>
+            <Button Content="View Products"
+                    Command="{Binding ShowProductsCommand}"
+                    Margin="10,0,0,0"
+                    Padding="10,2"/>
         </StackPanel>
 
+        <!-- ░░ Row 1 – last-scanned feedback ░░ -->
         <StackPanel Grid.Row="1" Margin="0,0,0,10">
-            <TextBlock Text="Last Scanned Item:" FontWeight="Bold" FontSize="18" Margin="0,0,0,5"/>
-            <TextBlock Text="{Binding FoundItemName}" FontSize="16" Margin="10,0,0,5" MinHeight="20"/>
-            <TextBlock Text="{Binding FoundItemPrice}" FontSize="16" Margin="10,0,0,0" MinHeight="20"/>
+            <TextBlock Text="Last Scanned Item:"
+                       FontWeight="Bold"
+                       FontSize="18"
+                       Margin="0,0,0,5"/>
+            <TextBlock Text="{Binding FoundItemName}"
+                       FontSize="16"
+                       Margin="10,0,0,5"
+                       MinHeight="20"/>
+            <TextBlock Text="{Binding FoundItemPrice}"
+                       FontSize="16"
+                       Margin="10,0,0,0"
+                       MinHeight="20"/>
         </StackPanel>
 
-        <DataGrid Grid.Row="2" Margin="0,10,0,0"
+        <!-- ░░ Row 2 – items grid ░░ -->
+        <DataGrid Grid.Row="2"
+                  Margin="0,10,0,0"
                   ItemsSource="{Binding ScannedItemsList}"
-                  SelectedItem="{Binding SelectedItem, Mode=TwoWay}" AutoGenerateColumns="False"
+                  SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                  AutoGenerateColumns="False"
                   IsReadOnly="True"
                   CanUserAddRows="False"
                   HeadersVisibility="Column"
                   SelectionMode="Single"
                   FontSize="14">
 
+            <!-- right-click selects row first -->
             <DataGrid.Resources>
-                <!-- Select the row that was right-clicked -->
                 <Style TargetType="DataGridRow">
                     <EventSetter Event="PreviewMouseRightButtonDown"
-                         Handler="DataGridRow_RightClick"/>
+                                 Handler="DataGridRow_RightClick"/>
                 </Style>
             </DataGrid.Resources>
 
-            <!-- Context-menu that calls EditQuantityCommand -->
+            <!-- context-menu uses same EditQuantityCommand -->
             <DataGrid.ContextMenu>
-                <!-- ①  Copy DataGrid's DataContext into the popup -->
                 <ContextMenu DataContext="{Binding PlacementTarget.DataContext,
-                                       RelativeSource={RelativeSource Self}}">
-                    <!-- ②  Now a simple binding works -->
+                                                   RelativeSource={RelativeSource Self}}">
                     <MenuItem Header="Change Qty"
-                  Command="{Binding EditQuantityCommand}"/>
+                              Command="{Binding EditQuantityCommand}"/>
                 </ContextMenu>
             </DataGrid.ContextMenu>
 
+            <!-- hot-keys -->
             <DataGrid.InputBindings>
                 <KeyBinding Key="Delete"
                             Command="{Binding DeleteItemCommand}"
                             CommandParameter="{Binding SelectedItem}"/>
-
                 <KeyBinding Key="F2"
-                Command="{Binding EditQuantityCommand}"/>
+                            Command="{Binding EditQuantityCommand}"/>
             </DataGrid.InputBindings>
 
+            <!-- 12-column layout -->
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Line"       Binding="{Binding LineNumber}"           Width="45"/>
-                <DataGridTextColumn Header="Brand"      Binding="{Binding Brand}"                Width="1.4*"/>
+                <DataGridTextColumn Header="Line"        Binding="{Binding LineNumber}"           Width="45"/>
+                <DataGridTextColumn Header="Brand"       Binding="{Binding Brand}"                Width="1.4*"/>
                 <DataGridTextColumn Header="Description" Binding="{Binding Description}"          Width="2.4*"/>
-                <DataGridTextColumn Header="Size"       Binding="{Binding Size}"                 Width="60"/>
-                <DataGridTextColumn Header="Pack"       Binding="{Binding Pack}"                 Width="60"/>
-                <DataGridTextColumn Header="Qty"        Binding="{Binding Quantity}"             Width="50"/>
-                <DataGridTextColumn Header="Price"      Binding="{Binding Price,   StringFormat=C}" Width="80"/>
-                <DataGridTextColumn Header="Tax"        Binding="{Binding Tax,     StringFormat=C}" Width="70"/>
-                <DataGridTextColumn Header="Deposit"    Binding="{Binding Deposit, StringFormat=C}" Width="80"/>
-                <DataGridTextColumn Header="Disc%"      Binding="{Binding Discount, StringFormat={}{0:N1}%}" Width="65"/>
-                <DataGridTextColumn Header="Sale"       Binding="{Binding Sale,    StringFormat=C}" Width="80"/>
-                <DataGridTextColumn Header="Extended"   Binding="{Binding Extended,StringFormat=C}" Width="90"/>
+                <DataGridTextColumn Header="Size"        Binding="{Binding Size}"                 Width="60"/>
+                <DataGridTextColumn Header="Pack"        Binding="{Binding Pack}"                 Width="60"/>
+                <DataGridTextColumn Header="Qty"         Binding="{Binding Quantity}"             Width="50"/>
+                <DataGridTextColumn Header="Price"       Binding="{Binding Price,   StringFormat=C}" Width="80"/>
+                <DataGridTextColumn Header="Tax"         Binding="{Binding Tax,     StringFormat=C}" Width="70"/>
+                <DataGridTextColumn Header="Deposit"     Binding="{Binding Deposit, StringFormat=C}" Width="80"/>
+                <DataGridTextColumn Header="Disc%"       Binding="{Binding Discount, StringFormat={}{0:N1}%}" Width="65"/>
+                <DataGridTextColumn Header="Sale"        Binding="{Binding Sale,    StringFormat=C}" Width="80"/>
+                <DataGridTextColumn Header="Extended"    Binding="{Binding Extended,StringFormat=C}" Width="90"/>
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- Bottom bar -->
+        <!-- ░░ Row 3 – bottom bar ░░ -->
         <Grid Grid.Row="3" Margin="0,10,0,0">
-            <!-- 0        1        2         3          4 -->
+            <!-- 0    1       2       3 -->
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <!-- pushes everything right -->
+                <!-- spacer -->
                 <ColumnDefinition Width="Auto"/>
-                <!-- "Total:" label         -->
+                <!-- Change Qty -->
                 <ColumnDefinition Width="Auto"/>
-                <!-- grand-total value      -->
+                <!-- Void Sale -->
                 <ColumnDefinition Width="Auto"/>
-                <!-- Change-Qty button      -->
-                <ColumnDefinition Width="Auto"/>
-                <!-- Void-Sale button       -->
+                <!-- totals panel -->
             </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="1" Text="Total:"
-               FontWeight="Bold" FontSize="20"
-               VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <!-- buttons -->
+            <Button Grid.Column="1"
+                    Content="Change Qty"
+                    Command="{Binding EditQuantityCommand}"
+                    FontSize="16"
+                    FontWeight="Bold"
+                    Padding="15,7"
+                    Margin="0,0,10,0"/>
 
-            <TextBlock Grid.Column="2"
-               Text="{Binding TotalPrice, StringFormat=C}"
-               FontSize="20" FontWeight="Bold"
-               VerticalAlignment="Center" Margin="0,0,20,0"
-               MinWidth="120" TextAlignment="Right"/>
+            <Button Grid.Column="2"
+                    Content="Void Sale"
+                    Command="{Binding VoidSaleCommand}"
+                    FontSize="16"
+                    FontWeight="Bold"
+                    Background="OrangeRed"
+                    Foreground="White"
+                    Padding="15,7"/>
 
-            <Button  Grid.Column="3" Content="Change Qty"
-             Command="{Binding EditQuantityCommand}"
-             FontSize="16" FontWeight="Bold"
-             Padding="15,7" Margin="0,0,10,0"/>
-
-            <Button  Grid.Column="4" Content="Void Sale"
-             Command="{Binding VoidSaleCommand}"
-             FontSize="16" FontWeight="Bold"
-             Background="OrangeRed" Foreground="White"
-             Padding="15,7"/>
+            <!-- running totals -->
+            <StackPanel Grid.Column="3"
+                        Margin="30,0,0,0">
+                <TextBlock Text="{Binding SubTotal,
+                                          StringFormat=Sub-total : {0:C}}"/>
+                <TextBlock Text="{Binding GeneralTaxTotal,
+                                          StringFormat=Sales tax : {0:C}}"/>
+                <TextBlock Text="{Binding AlcoholTaxTotal,
+                                          StringFormat=Alcohol tax : {0:C}}"/>
+                <Separator/>
+                <TextBlock FontWeight="Bold"
+                           Text="{Binding GrandTotal,
+                                          StringFormat=TOTAL DUE : {0:C}}"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

@@ -1,30 +1,69 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using LiquorPOS.Models;
+﻿using LiquorPOS.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace LiquorPOS
+namespace LiquorPOS;
+
+public class LiquorDbContext : DbContext
 {
-    public class LiquorDbContext : DbContext
+    // ctor used by DI – options carry the connection string
+    public LiquorDbContext(DbContextOptions<LiquorDbContext> options)
+        : base(options)
     {
-        public DbSet<Product> Products { get; set; }
-        public DbSet<Barcode> Barcodes { get; set; }
+    }
 
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        {
-            // IMPORTANT: Replace with your actual connection details!
-            string connectionString = "Host=100.71.49.34;Port=5432;Database=liquor_store_pos;Username=postgres;Password=postgres";
-            optionsBuilder.UseNpgsql(connectionString);
-        }
+    // DbSets
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<Barcode> Barcodes => Set<Barcode>();
+    public DbSet<TaxComponent> TaxComponents => Set<TaxComponent>();
+    public DbSet<ProductTaxComponent> ProductTaxComponents => Set<ProductTaxComponent>();
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            // You can add more detailed configuration here if needed,
-            // but often EF Core can figure things out from the Models.
-            base.OnModelCreating(modelBuilder);
-        }
+    protected override void OnModelCreating(ModelBuilder mb)
+    {
+        base.OnModelCreating(mb);
+
+        mb.Entity<TaxComponent>()
+          .ToTable("TaxComponent");                     // table name
+
+        mb.Entity<TaxComponent>()
+          .Property(tc => tc.ComponentId)
+          .HasColumnName("component_id");
+
+        mb.Entity<TaxComponent>()
+          .Property(tc => tc.Name)
+          .HasColumnName("name");
+
+        mb.Entity<TaxComponent>()
+          .Property(tc => tc.Rate)
+          .HasColumnName("rate");
+
+        mb.Entity<ProductTaxComponent>()
+          .ToTable("ProductTaxComponent")
+          .HasKey(l => new { l.CodeNum, l.ComponentId });
+
+        mb.Entity<ProductTaxComponent>()
+          .Property(l => l.CodeNum)
+          .HasColumnName("code_num");
+
+        mb.Entity<ProductTaxComponent>()
+          .Property(l => l.ComponentId)
+          .HasColumnName("component_id");
+
+        // primary keys
+        mb.Entity<Product>().HasKey(p => p.CodeNum);
+        mb.Entity<TaxComponent>()
+      .HasKey(tc => tc.ComponentId);          //  ← NEW
+        mb.Entity<ProductTaxComponent>()
+          .HasKey(l => new { l.CodeNum, l.ComponentId });
+
+        // relationships
+        mb.Entity<ProductTaxComponent>()
+          .HasOne(l => l.Product)
+          .WithMany()
+          .HasForeignKey(l => l.CodeNum);
+
+        mb.Entity<ProductTaxComponent>()
+          .HasOne(l => l.TaxComponent)
+          .WithMany(c => c.ProductLinks)
+          .HasForeignKey(l => l.ComponentId);
     }
 }

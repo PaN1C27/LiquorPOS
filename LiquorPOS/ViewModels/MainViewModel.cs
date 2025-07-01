@@ -1,166 +1,154 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LiquorPOS.Models; // Ensure this namespace is correct for your Product, Barcode models
+using LiquorPOS.Models;
+using LiquorPOS.Services;
 using Microsoft.EntityFrameworkCore;
-using System;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
-using LiquorPOS;
+using System.Linq;                  // ← add this
+using LiquorPOS;                    // ← only if ProductListWindow isn’t found
+/* existing using lines stay */
 
-namespace LiquorPOS.ViewModels // Ensure this namespace is correct
+
+namespace LiquorPOS.ViewModels;
+
+public partial class MainViewModel : ObservableObject
 {
-    public partial class MainViewModel : BaseViewModel // Assuming BaseViewModel is set up
+    private readonly ITaxService _taxService;
+    private readonly IDbContextFactory<LiquorDbContext> _dbFactory;
+    private readonly IServiceProvider _services;
+
+    public MainViewModel(ITaxService taxService,
+                         IDbContextFactory<LiquorDbContext> dbFactory, IServiceProvider services)
     {
-        [ObservableProperty]
-        private string? _barcodeText;
+        _taxService = taxService;
+        _dbFactory = dbFactory;
+        _services = services;
 
-        [ObservableProperty]
-        private string _foundItemName = "---";
+        ScannedItemsList.CollectionChanged += (_, __) => RecalculateTotals();
+    }
 
-        [ObservableProperty]
-        private string _foundItemPrice = "---";
+    // 🔵 1) currently-selected grid row
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(EditQuantityCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteItemCommand))]
+    private ScannedItemViewModel? _selectedItem;
 
-        [ObservableProperty]
-        private ObservableCollection<ScannedItemViewModel> _scannedItemsList;
+    // 🔵 2) Change-Qty command  (F2, button, context-menu)
+    [RelayCommand(CanExecute = nameof(CanModifyLine))]
+    private void EditQuantity()
+    {
+        if (SelectedItem is null) return;
 
-        [ObservableProperty]
-        private decimal _totalPrice;
+        // open the dialog
+        var dlg = new QuantityInputWindow(SelectedItem.Quantity)
+        { Owner = Application.Current.MainWindow };
 
-        [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(DeleteItemCommand))]
-        [NotifyCanExecuteChangedFor(nameof(EditQuantityCommand))]
-        private ScannedItemViewModel? _selectedItem;
-
-        public MainViewModel()
+        if (dlg.ShowDialog() == true)
         {
-            ScannedItemsList = new ObservableCollection<ScannedItemViewModel>();
-            ScannedItemsList.CollectionChanged += ScannedItemsList_CollectionChanged;
-            TotalPrice = 0m;
+            SelectedItem.Quantity = dlg.EnteredQuantity;
+            SelectedItem.RefreshTax(_taxService, DateTime.Today);
+            RecalculateTotals();
         }
+    }
 
-        private void ScannedItemsList_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        {
-            CalculateTotalPrice();
-        }
+    // 🔵 3) Delete-line command   (Delete key)
+    [RelayCommand(CanExecute = nameof(CanModifyLine))]
+    private void DeleteItem()
+    {
+        if (SelectedItem is null) return;
+        ScannedItemsList.Remove(SelectedItem);
+        RenumberLines();
+        RecalculateTotals();
+    }
 
-        private void CalculateTotalPrice()
-        {
-            TotalPrice = ScannedItemsList.Sum(i => i.Extended ?? 0m);
-        }
+    // 🔵 4) Void-sale command    (button)
+    [RelayCommand]
+    private void VoidSale()
+    {
+        ScannedItemsList.Clear();
+        RecalculateTotals();
+    }
 
-        [RelayCommand]
-        private async Task ScanBarcodeAsync()
+    // helper so CanExecute updates with selection
+    private bool CanModifyLine() => SelectedItem != null;
+
+    private void RenumberLines()
+    {
+        for (int i = 0; i < ScannedItemsList.Count; i++)
+            ScannedItemsList[i].LineNumber = i + 1;
+    }
+
+    // ── collections & simple props ─────────────────────────────────
+    public ObservableCollection<ScannedItemViewModel> ScannedItemsList { get; } = [];
+
+    [ObservableProperty] private string _barcodeText = string.Empty;
+    [ObservableProperty] private string _foundItemName = string.Empty;
+    [ObservableProperty] private string _foundItemPrice = string.Empty;
+
+    // Ticket-level totals
+    [ObservableProperty] private decimal _subTotal;
+    [ObservableProperty] private decimal _generalTaxTotal;
+    [ObservableProperty] private decimal _alcoholTaxTotal;
+    [ObservableProperty] private decimal _grandTotal;
+
+    // ── barcode scan command (async) ───────────────────────────────
+    [RelayCommand]
+    private async Task ScanBarcodeAsync()
+    {
+        var code = BarcodeText.Trim();
+        if (code.Length == 0) return;
+
+        try
         {
-            if (string.IsNullOrWhiteSpace(BarcodeText))
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
+            var hit = await db.Barcodes
+                              .Include(b => b.Product)
+                              .FirstOrDefaultAsync(b => b.BarcodeValue == code);
+
+            if (hit?.Product == null)
             {
+                FoundItemName = "Item Not Found";
+                FoundItemPrice = "---";
                 return;
             }
 
-            string scannedBarcode = BarcodeText.Trim();
-            FoundItemName = "Searching...";
-            FoundItemPrice = "---";
+            var line = new ScannedItemViewModel(hit.Product, 1,
+                                 ScannedItemsList.Count + 1);
 
-            try
-            {
-                await using (var context = new LiquorDbContext()) // Ensure LiquorDbContext is correctly named and configured
-                {
-                    var barcodeEntry = await context.Barcodes
-                                                 .Include(b => b.Product)
-                                                 .FirstOrDefaultAsync(b => b.BarcodeValue == scannedBarcode);
+            line.RefreshTax(_taxService, DateTime.Today);
+            ScannedItemsList.Add(line);
 
-                    if (barcodeEntry != null && barcodeEntry.Product != null)
-                    {
-                        var product = barcodeEntry.Product;
-                        FoundItemName = $"{product.Brand} {product.Description}".Trim();
-                        FoundItemPrice = $"{product.Price:C}";
-
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            var newItem = new ScannedItemViewModel(product, 1, ScannedItemsList.Count + 1);
-                            ScannedItemsList.Add(newItem);
-                        });
-                    }
-                    else
-                    {
-                        FoundItemName = "Item Not Found";
-                        FoundItemPrice = "---";
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                FoundItemName = "DATABASE ERROR!";
-                FoundItemPrice = "Check connection or logs.";
-                MessageBox.Show(ex.ToString(), "Database Exception Details");
-            }
-            finally
-            {
-                BarcodeText = string.Empty;
-            }
-        }
-
-        [RelayCommand]
-        private void VoidSale()
-        {
-            if (ScannedItemsList.Any())
-            {
-                ScannedItemsList.Clear();
-                FoundItemName = "---";
-                FoundItemPrice = "---";
-            }
+            FoundItemName = $"{line.Brand} {line.Description}".Trim();
+            FoundItemPrice = $"{line.Price:C}";
             BarcodeText = string.Empty;
         }
-
-        // This method determines if DeleteItemCommand can execute
-        private bool CanModifyOrDeleteItem()
+        catch (Exception ex)
         {
-            return SelectedItem != null;
+            MessageBox.Show(ex.ToString(), "Database error");
         }
+    }
 
-        // Command to Delete an Item (used by DEL key)
-        [RelayCommand(CanExecute = nameof(CanModifyOrDeleteItem))]
-        private void DeleteItem(ScannedItemViewModel? itemToDelete)
-        {
-            // For DEL key, itemToDelete will be the SelectedItem passed as CommandParameter
-            var itemToRemove = itemToDelete ?? SelectedItem;
+    [RelayCommand]
+    private void ShowProducts()
+    {
+        var win = _services.GetRequiredService<ProductListWindow>();
+        win.Owner = Application.Current.MainWindow;
+        win.ShowDialog();
+    }
 
-            if (itemToRemove != null && ScannedItemsList.Contains(itemToRemove))
-            {
-                ScannedItemsList.Remove(itemToRemove);
-                if (SelectedItem == itemToRemove)
-                {
-                    SelectedItem = null;
-                }
-            }
-        }
-
-        // Command runs only when something is selected
-        [RelayCommand(CanExecute = nameof(CanModifyOrDeleteItem))]
-        private void EditQuantity()
-        {
-            if (SelectedItem is null) return;
-
-            var dlg = new QuantityInputWindow(SelectedItem.Quantity)
-            {
-                Owner = Application.Current.MainWindow
-            };
-
-            if (dlg.ShowDialog() == true)
-            {
-                SelectedItem.Quantity = dlg.EnteredQuantity;
-                // Re-compute grand total
-                CalculateTotalPrice();
-            }
-        }
-
-        [RelayCommand]
-        private void ShowProducts()
-        {
-            var window = new ProductListWindow();
-            window.Show();
-        }
+    // ── helper ────────────────────────────────────────────────────
+    private void RecalculateTotals()
+    {
+        SubTotal = ScannedItemsList.Sum(l => (l.Price ?? 0m) * l.Quantity);
+        GeneralTaxTotal = ScannedItemsList.SelectMany(l => l.LineTax)
+                                          .Where(t => t.ComponentName == "General")
+                                          .Sum(t => t.Amount);
+        AlcoholTaxTotal = ScannedItemsList.SelectMany(l => l.LineTax)
+                                          .Where(t => t.ComponentName == "Alcohol")
+                                          .Sum(t => t.Amount);
+        GrandTotal = SubTotal + GeneralTaxTotal + AlcoholTaxTotal;
     }
 }
